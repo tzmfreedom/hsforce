@@ -69,13 +69,26 @@ login' = do
   version <- getEnv "SALESFORCE_VERSION"
   login username password endpoint version
 
-login'' :: IO (SFClient)
-login'' = do
-  username <- getEnv "SALESFORCE_USERNAME"
-  password <- getEnv "SALESFORCE_PASSWORD"
-  endpoint <- getEnv "SALESFORCE_ENDPOINT"
-  version <- getEnv "SALESFORCE_VERSION"
-  login username password endpoint version
+login'' :: String -> String -> String -> String -> String -> String -> IO ()
+login'' username password endpoint version clientId clientSecret = do
+  initReq <- parseRequest $ "https://" ++ endpoint ++ "/services/oauth2/token"
+  manager <- newManager tlsManagerSettings
+  let params = [
+        ("grant_type", "password"),
+        ("client_id", clientId),
+        ("client_secret", clientSecret),
+        ("username", username),
+        ("password", password)
+        ]
+      requestBody = L.tail $ L.foldl (\body (k,v) -> body ++ "&" ++ k ++ "=" ++ URI.encode v) "" params
+      req = initReq {
+        method = "POST",
+        requestHeaders = [("Content-Type", "text/xml"), ("SOAPAction", "''")],
+        requestBody = RequestBodyBS $ B8.pack requestBody
+      }
+  print requestBody
+  response <- httpLbs req manager
+  print response
 
 requestGet :: SFClient -> String -> IO (Response BL8.ByteString)
 requestGet = requestWithoutBody "GET"

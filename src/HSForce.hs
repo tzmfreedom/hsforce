@@ -6,6 +6,7 @@
 module HSForce
     ( login,
       login',
+      login'',
       HSForce.versions,
       HSForce.query,
       HSForce.queryAll,
