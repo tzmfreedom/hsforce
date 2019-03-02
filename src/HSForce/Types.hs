@@ -66,8 +66,26 @@ data DescribeDetail = DescribeDetail{
   ddName:: String
 } deriving Show
 
+data RecordCount = RecordCount{
+  rcsObjects :: [SObjectCount]
+} deriving Show
+
+data SObjectCount = SObjectCount{
+  scCount :: Int,
+  scName :: String
+} deriving Show
+
+data Version = Version{
+  vVersion :: String,
+  vLabel :: String,
+  vUrl :: String
+} deriving Show
+
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "qr" } ''QueryResponse
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "dr" } ''DescribeResponse
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "od" } ''ObjectDescribe
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "dd" } ''DescribeDetail
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "gd" } ''GlobalDescribeResponse
+deriveJSON defaultOptions { fieldLabelModifier = drop 2 } ''RecordCount
+deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "sc" } ''SObjectCount
+deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "v" } ''Version

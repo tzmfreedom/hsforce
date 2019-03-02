@@ -6,7 +6,12 @@
 module HSForce
     ( login,
       login',
+      HSForce.versions,
       HSForce.query,
+      HSForce.queryAll,
+      HSForce.queryMore,
+      HSForce.queryAllMore,
+      HSForce.recordCount,
       HSForce.insert,
       HSForce.update,
       HSForce.upsert,
@@ -43,9 +48,48 @@ import HSForce.Types
 
 query :: (FromJSON a) => SFClient -> String -> DP.Proxy a -> IO (QueryResponse a)
 query client q _ = do
-  let path = dataPath client ++ "/query?q=" ++ URI.encode q
+  let path = dataPath client ++ "/query/?q=" ++ URI.encode q
   response <- requestGet client path
   let res = (JSON.decode $ responseBody response) :: (FromJSON a) => Maybe (QueryResponse a)
+  return (fromJust res)
+
+queryMore :: (FromJSON a) => SFClient -> String -> DP.Proxy a -> IO (QueryResponse a)
+queryMore client qpath _ = do
+  response <- requestGet client qpath
+  let res = (JSON.decode $ responseBody response) :: (FromJSON a) => Maybe (QueryResponse a)
+  return (fromJust res)
+
+queryAll :: (FromJSON a) => SFClient -> String -> DP.Proxy a -> IO (QueryResponse a)
+queryAll client q _ = do
+  let path = dataPath client ++ "/queryAll/?q=" ++ URI.encode q
+  response <- requestGet client path
+  let res = (JSON.decode $ responseBody response) :: (FromJSON a) => Maybe (QueryResponse a)
+  return (fromJust res)
+
+queryAllMore :: (FromJSON a) => SFClient -> String -> DP.Proxy a -> IO (QueryResponse a)
+queryAllMore client qpath _ = do
+  response <- requestGet client qpath
+  let res = (JSON.decode $ responseBody response) :: (FromJSON a) => Maybe (QueryResponse a)
+  return (fromJust res)
+
+search :: (FromJSON a) => SFClient -> String -> DP.Proxy a -> IO (QueryResponse a)
+search client q _ = do
+  let path = dataPath client ++ "/search/?q=" ++ URI.encode q
+  response <- requestGet client path
+  let res = (JSON.decode $ responseBody response) :: (FromJSON a) => Maybe (QueryResponse a)
+  return (fromJust res)
+
+recordCount :: SFClient -> [String] -> IO (RecordCount)
+recordCount client objects = do
+  let path = dataPath client ++ "/limits/recordCount?sObjects=" ++ L.intercalate "," objects
+  response <- requestGet client path
+  let res = (JSON.decode $ responseBody response) :: Maybe RecordCount
+  return (fromJust res)
+
+versions :: SFClient -> IO ([Version])
+versions client = do
+  response <- requestGet client "/services/data"
+  let res = (JSON.decode $ responseBody response) :: Maybe [Version]
   return (fromJust res)
 
 insert :: (SObject a, ToJSON a) => SFClient -> a -> IO ()

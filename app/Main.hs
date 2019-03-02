@@ -46,4 +46,7 @@ main = do
 --  upsert client' Account{sfid=Nothing, name = Just "foobar", ex = Just "aaa"} "Ex__c" "aaa"
 --  print =<< query client' "SELECT Id, Name FROM Account WHERE Name = 'foobar'" (Proxy :: Proxy Account)
 --  print =<< HSForce.describe client' "Account" (Proxy :: Proxy Account)
-  print =<< HSForce.describeGlobal client'
+--  print =<< HSForce.describeGlobal client'
+--  print =<< queryAll client' "SELECT Id, Name FROM Account WHERE Name = 'foobar'" (Proxy :: Proxy Account)
+  print =<< versions client'
+  print =<< recordCount client' ["Account", "Contact", "Opportunity"]

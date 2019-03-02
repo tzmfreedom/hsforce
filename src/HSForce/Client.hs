@@ -69,6 +69,14 @@ login' = do
   version <- getEnv "SALESFORCE_VERSION"
   login username password endpoint version
 
+login'' :: IO (SFClient)
+login'' = do
+  username <- getEnv "SALESFORCE_USERNAME"
+  password <- getEnv "SALESFORCE_PASSWORD"
+  endpoint <- getEnv "SALESFORCE_ENDPOINT"
+  version <- getEnv "SALESFORCE_VERSION"
+  login username password endpoint version
+
 requestGet :: SFClient -> String -> IO (Response BL8.ByteString)
 requestGet = requestWithoutBody "GET"
 
