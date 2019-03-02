@@ -30,6 +30,7 @@ dependencies:
 - regex-posix
 - uri-encode
 - aeson
+- template-haskell
 
 library:
   source-dirs: src

@@ -1,9 +1,11 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-} {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module HSForce
     ( login,
+      login',
       typeName,
       getSfid,
       HSForce.query,
@@ -12,6 +14,8 @@ module HSForce
       HSForce.upsert,
       HSForce.delete,
       HSForce.describe,
+      HSForce.describeDetail,
+      HSForce.describeGlobal,
       SObject,
       SFClient(..),
     ) where
@@ -20,7 +24,9 @@ import Network.HTTP.Conduit
 import Network.URI
 import Network.URI.Encode as URI
 import System.IO
+import System.Environment
 import Data.Aeson as JSON
+import Data.Aeson.TH (deriveJSON, defaultOptions, Options(..))
 import Data.ByteString.Char8 as B8
 import Data.ByteString.Lazy.Char8 as BL8
 import Data.Proxy as DP
@@ -32,96 +38,67 @@ import Text.XML.HaXml.Posn
 import Text.XML.HaXml.Util
 import Text.XML.HaXml.Xtract.Parse
 import Text.Regex.Posix
+import GHC.Generics
+import HSForce.Util
 
 data SFClient = SFClient {
-  accessToken :: String,
-  instanceUrl :: String,
-  apiVersion:: String,
-  debug :: Bool
+  clientAccessToken :: String,
+  clientInstanceUrl :: String,
+  clientApiVersion:: String,
+  clientDebug :: Bool
 } deriving Show
 
 data QueryResponse a = QueryResponse{
-  records :: [a],
-  totalSize :: Int,
-  done :: Bool
+  qrRecords :: [a],
+  qrTotalSize :: Int,
+  qrDone :: Bool
 } deriving Show
-
-instance (FromJSON a) => FromJSON (QueryResponse a) where
-  parseJSON = withObject "QueryResponse" $ \v -> do
-    records <- v .: "records"
-    totalSize <- v .: "totalSize"
-    done <- v .: "done"
-    return QueryResponse{..}
 
 class SObject a where
   typeName :: a -> String
   getSfid :: a -> String
 
 data DescribeResponse a = DescribeResponse{
-  objectDescribe :: ObjectDescribe,
-  recentItems :: [a]
+  drObjectDescribe :: ObjectDescribe,
+  drRecentItems :: [a]
 } deriving Show
-
-instance (FromJSON a) => FromJSON (DescribeResponse a) where
-  parseJSON = withObject "QueryResponse" $ \v -> do
-    objectDescribe <- v .: "objectDescribe"
-    recentItems <- v .: "recentItems"
-    return DescribeResponse{..}
 
 data ObjectDescribe = ObjectDescribe {
-  activateable :: Bool,
-  createable :: Bool,
-  custom :: Bool,
-  customSetting :: Bool,
-  deletable :: Bool,
-  deprecatedAndHidden :: Bool,
-  feedEnabled :: Bool,
-  hasSubtypes :: Bool,
-  isSubtype :: Bool,
-  keyPrefix :: String,
-  label :: String,
-  labelPlural :: String,
-  layoutable :: Bool,
-  mergeable :: Bool,
-  mruEnabled :: Bool,
-  name :: String,
-  queryable :: Bool,
-  replicateable :: Bool,
-  retrieveable :: Bool,
-  searchable :: Bool,
-  triggerable :: Bool,
-  undeletable :: Bool,
-  updateable :: Bool,
-  urls :: Object
+  odActivateable :: Bool,
+  odCreateable :: Bool,
+  odCustom :: Bool,
+  odCustomSetting :: Bool,
+  odDeletable :: Bool,
+  odDeprecatedAndHidden :: Bool,
+  odFeedEnabled :: Bool,
+  odHasSubtypes :: Bool,
+  odIsSubtype :: Bool,
+  odKeyPrefix :: Maybe String,
+  odLabel :: String,
+  odLabelPlural :: String,
+  odLayoutable :: Bool,
+  odMergeable :: Bool,
+  odMruEnabled :: Bool,
+  odName :: String,
+  odQueryable :: Bool,
+  odReplicateable :: Bool,
+  odRetrieveable :: Bool,
+  odSearchable :: Bool,
+  odTriggerable :: Bool,
+  odUndeletable :: Bool,
+  odUpdateable :: Bool,
+  odUrls :: Object
 } deriving Show
 
-instance FromJSON ObjectDescribe where
-  parseJSON = withObject "ObjectDescribe" $ \v -> do
-    activateable <- v .: "activateable"
-    createable <- v .: "createable"
-    custom <- v .: "custom"
-    customSetting <- v .: "customSetting"
-    deletable <- v .: "deletable"
-    deprecatedAndHidden <- v .: "deprecatedAndHidden"
-    feedEnabled <- v .: "feedEnabled"
-    hasSubtypes <- v .: "hasSubtypes"
-    isSubtype <- v .: "isSubtype"
-    keyPrefix <- v .: "keyPrefix"
-    label <- v .: "label"
-    labelPlural <- v .: "labelPlural"
-    layoutable <- v .: "layoutable"
-    mergeable <- v .: "mergeable"
-    mruEnabled <- v .: "mruEnabled"
-    name <- v .: "name"
-    queryable <- v .: "queryable"
-    replicateable <- v .: "replicateable"
-    retrieveable <- v .: "retrieveable"
-    searchable <- v .: "searchable"
-    triggerable <- v .: "triggerable"
-    undeletable <- v .: "undeletable"
-    updateable <- v .: "updateable"
-    urls <- v .: "urls"
-    return ObjectDescribe{..}
+data GlobalDescribeResponse = GlobalDescribeResponse{
+  gdEncoding :: String,
+  gdMaxBatchSize :: Int,
+  gdSobjects :: [ObjectDescribe]
+} deriving Show
+
+data DescribeDetail = DescribeDetail{
+  ddName:: String
+} deriving Show
 
 replace :: String -> String -> String -> String
 replace old new src = inner src where
@@ -131,7 +108,7 @@ replace old new src = inner src where
     | otherwise = x:inner xs
 
 login :: String -> String -> String -> String -> IO (SFClient)
-login username password endpoint apiVersion = do
+login username password endpoint clientApiVersion = do
   let body = "<?xml version=\"1.0\" encoding=\"utf-8\"?> \
   \<env:Envelope xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:env=\"http://schemas.xmlsoap.org/soap/envelope/\"> \
     \<env:Body> \
@@ -141,7 +118,7 @@ login username password endpoint apiVersion = do
      \</n1:login> \
    \</env:Body> \
   \</env:Envelope>" :: String
-  initReq <- parseRequest $ "https://" ++ endpoint ++ "/services/Soap/u/" ++ apiVersion
+  initReq <- parseRequest $ "https://" ++ endpoint ++ "/services/Soap/u/" ++ clientApiVersion
   manager <- newManager tlsManagerSettings
   let requestBody = L.foldl (\body (bind,value) -> replace bind (escapeXML value) body) body [("{username}", username), ("{password}", password)]
   let req = initReq {
@@ -153,10 +130,18 @@ login username password endpoint apiVersion = do
   let Document _ _ root _ = xmlParse "" $ (BL8.unpack (responseBody response))
       cont = CElem root noPos
       result = xtract id "/soapenv:Envelope/soapenv:Body/loginResponse/result" cont !! 0
-      accessToken = tagText result "/result/sessionId"
-      serverUrl = tagText result "/result/serverUrl"
-      matches = serverUrl =~ ("^(https://[^/]*)/.*" :: String) :: [[String]]
-  return SFClient{accessToken, apiVersion, instanceUrl = matches !! 0 !! 1, debug = False}
+      clientAccessToken = tagText result "/result/sessionId"
+      clientServerUrl = tagText result "/result/serverUrl"
+      matches = clientServerUrl =~ ("^(https://[^/]*)/.*" :: String) :: [[String]]
+  return SFClient{clientAccessToken, clientApiVersion, clientInstanceUrl = matches !! 0 !! 1, clientDebug = False}
+
+login' :: IO (SFClient)
+login' = do
+  username <- getEnv "SALESFORCE_USERNAME"
+  password <- getEnv "SALESFORCE_PASSWORD"
+  endpoint <- getEnv "SALESFORCE_ENDPOINT"
+  version <- getEnv "SALESFORCE_VERSION"
+  login username password endpoint version
 
 query :: (FromJSON a) => SFClient -> String -> DP.Proxy a -> IO (QueryResponse a)
 query client q _ = do
@@ -196,6 +181,20 @@ describe client objectName _ = do
   let res = (JSON.decode $ responseBody response) :: (FromJSON a) => Maybe (DescribeResponse a)
   return (fromJust res)
 
+describeDetail :: SFClient -> String -> IO DescribeDetail
+describeDetail client objectName = do
+  let path = dataPath client ++ "/sobjects/" ++ objectName ++ "/describe"
+  response <- requestGet client path
+  let res = (JSON.decode $ responseBody response) :: Maybe DescribeDetail
+  return (fromJust res)
+
+describeGlobal :: SFClient -> IO GlobalDescribeResponse
+describeGlobal client = do
+  let path = dataPath client ++ "/sobjects"
+  response <- requestGet client path
+  let res = (JSON.decode $ responseBody response) :: Maybe GlobalDescribeResponse
+  return (fromJust res)
+
 requestGet :: SFClient -> String -> IO (Response BL8.ByteString)
 requestGet = requestWithoutBody "GET"
 
@@ -204,11 +203,11 @@ requestDelete = requestWithoutBody "DELETE"
 
 requestWithoutBody :: B8.ByteString -> SFClient -> String -> IO (Response BL8.ByteString)
 requestWithoutBody method client path = do
-  initReq <- parseRequest $ instanceUrl client ++ path
+  initReq <- parseRequest $ clientInstanceUrl client ++ path
   manager <- newManager tlsManagerSettings
   let req = initReq {
     method = method,
-    requestHeaders = [("Authorization", B8.pack $ "Bearer " ++ (accessToken client))]
+    requestHeaders = [("Authorization", B8.pack $ "Bearer " ++ (clientAccessToken client))]
   }
   printDebug client req
   response <- httpLbs req manager
@@ -217,13 +216,13 @@ requestWithoutBody method client path = do
 
 requestWithBody :: B8.ByteString -> SFClient -> String -> String -> IO (Response BL8.ByteString)
 requestWithBody method client path body = do
-  initReq <- parseRequest $ instanceUrl client ++ path
+  initReq <- parseRequest $ clientInstanceUrl client ++ path
   manager <- newManager tlsManagerSettings
   let req = initReq {
     method = method,
     requestHeaders = [
       ("Content-Type", "application/json"),
-      ("Authorization", B8.pack $ "Bearer " ++ (accessToken client))
+      ("Authorization", B8.pack $ "Bearer " ++ (clientAccessToken client))
     ],
     requestBody = RequestBodyBS $ B8.pack body
   }
@@ -240,12 +239,19 @@ requestPatch = requestWithBody "PATCH"
 
 printDebug :: (Show a) => SFClient -> a -> IO ()
 printDebug client var = do
-  if debug client then print var else pure ()
+  if clientDebug client then print var else pure ()
 
 dataPath :: SFClient -> String
 dataPath client = do
-  "/services/data/" ++ (apiVersion client)
+  "/services/data/" ++ (clientApiVersion client)
 
 tagText :: Content a -> String -> String
 tagText result xpath = do
   tagTextContent $ xtract id xpath result !! 0
+
+deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "client" } ''SFClient
+deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "qr" } ''QueryResponse
+deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "dr" } ''DescribeResponse
+deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "od" } ''ObjectDescribe
+deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "dd" } ''DescribeDetail
+deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "gd" } ''GlobalDescribeResponse
