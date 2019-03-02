@@ -92,6 +92,18 @@ versions client = do
   let res = (JSON.decode $ responseBody response) :: Maybe [Version]
   return (fromJust res)
 
+batchRequest :: (ToJSON a) => SFClient -> [BatchRequest a] -> IO ()
+batchRequest client requests = do
+  let path = dataPath client ++ "/composite/batch"
+  response <- requestPost client path $ BL8.unpack $ JSON.encode requests -- TODO: impl
+  return ()
+
+tree :: (ToJSON a, SObject a) => SFClient -> [a] -> IO ()
+tree client objects = do
+  let path = dataPath client ++ "/composite/tree/" ++ typeName (objects !! 0)
+  response <- requestPost client path $ BL8.unpack $ JSON.encode objects
+  return ()
+
 insert :: (SObject a, ToJSON a) => SFClient -> a -> IO ()
 insert client object = do
   let path = dataPath client ++ "/sobjects/" ++ typeName object

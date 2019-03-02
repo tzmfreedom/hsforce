@@ -81,6 +81,14 @@ data Version = Version{
   vUrl :: String
 } deriving Show
 
+data BatchRequest a = BatchRequest{
+  brBinaryPartName :: String,
+  brMethod :: String,
+  brRichInput :: a,
+  brUrl :: String,
+  brBinaryPartNameAlias :: String
+} deriving Show
+
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "qr" } ''QueryResponse
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "dr" } ''DescribeResponse
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "od" } ''ObjectDescribe
@@ -89,3 +97,4 @@ deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "gd" } '
 deriveJSON defaultOptions { fieldLabelModifier = drop 2 } ''RecordCount
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "sc" } ''SObjectCount
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "v" } ''Version
+deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "br" } ''BatchRequest
