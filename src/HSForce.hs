@@ -11,6 +11,7 @@ module HSForce
       HSForce.update,
       HSForce.upsert,
       HSForce.delete,
+      HSForce.describe,
       SObject,
       SFClient(..),
     ) where
@@ -55,6 +56,72 @@ instance (FromJSON a) => FromJSON (QueryResponse a) where
 class SObject a where
   typeName :: a -> String
   getSfid :: a -> String
+
+data DescribeResponse a = DescribeResponse{
+  objectDescribe :: ObjectDescribe,
+  recentItems :: [a]
+} deriving Show
+
+instance (FromJSON a) => FromJSON (DescribeResponse a) where
+  parseJSON = withObject "QueryResponse" $ \v -> do
+    objectDescribe <- v .: "objectDescribe"
+    recentItems <- v .: "recentItems"
+    return DescribeResponse{..}
+
+data ObjectDescribe = ObjectDescribe {
+  activateable :: Bool,
+  createable :: Bool,
+  custom :: Bool,
+  customSetting :: Bool,
+  deletable :: Bool,
+  deprecatedAndHidden :: Bool,
+  feedEnabled :: Bool,
+  hasSubtypes :: Bool,
+  isSubtype :: Bool,
+  keyPrefix :: String,
+  label :: String,
+  labelPlural :: String,
+  layoutable :: Bool,
+  mergeable :: Bool,
+  mruEnabled :: Bool,
+  name :: String,
+  queryable :: Bool,
+  replicateable :: Bool,
+  retrieveable :: Bool,
+  searchable :: Bool,
+  triggerable :: Bool,
+  undeletable :: Bool,
+  updateable :: Bool,
+  urls :: Object
+} deriving Show
+
+instance FromJSON ObjectDescribe where
+  parseJSON = withObject "ObjectDescribe" $ \v -> do
+    activateable <- v .: "activateable"
+    createable <- v .: "createable"
+    custom <- v .: "custom"
+    customSetting <- v .: "customSetting"
+    deletable <- v .: "deletable"
+    deprecatedAndHidden <- v .: "deprecatedAndHidden"
+    feedEnabled <- v .: "feedEnabled"
+    hasSubtypes <- v .: "hasSubtypes"
+    isSubtype <- v .: "isSubtype"
+    keyPrefix <- v .: "keyPrefix"
+    label <- v .: "label"
+    labelPlural <- v .: "labelPlural"
+    layoutable <- v .: "layoutable"
+    mergeable <- v .: "mergeable"
+    mruEnabled <- v .: "mruEnabled"
+    name <- v .: "name"
+    queryable <- v .: "queryable"
+    replicateable <- v .: "replicateable"
+    retrieveable <- v .: "retrieveable"
+    searchable <- v .: "searchable"
+    triggerable <- v .: "triggerable"
+    undeletable <- v .: "undeletable"
+    updateable <- v .: "updateable"
+    urls <- v .: "urls"
+    return ObjectDescribe{..}
 
 replace :: String -> String -> String -> String
 replace old new src = inner src where
@@ -119,19 +186,33 @@ upsert client object upsertKey upsertKeyValue = do
 delete :: (SObject a, ToJSON a) => SFClient -> a -> IO ()
 delete client object = do
   let path = dataPath client ++ "/sobjects/" ++ typeName object ++ '/':getSfid object
-  response <- requestDelete client path $ BL8.unpack $ JSON.encode object
+  response <- requestDelete client path
   return ()
 
+describe :: (FromJSON a) => SFClient -> String -> DP.Proxy a -> IO (DescribeResponse a)
+describe client objectName _ = do
+  let path = dataPath client ++ "/sobjects/" ++ objectName
+  response <- requestGet client path
+  let res = (JSON.decode $ responseBody response) :: (FromJSON a) => Maybe (DescribeResponse a)
+  return (fromJust res)
+
 requestGet :: SFClient -> String -> IO (Response BL8.ByteString)
-requestGet client path = do
+requestGet = requestWithoutBody "GET"
+
+requestDelete :: SFClient -> String -> IO (Response BL8.ByteString)
+requestDelete = requestWithoutBody "DELETE"
+
+requestWithoutBody :: B8.ByteString -> SFClient -> String -> IO (Response BL8.ByteString)
+requestWithoutBody method client path = do
   initReq <- parseRequest $ instanceUrl client ++ path
   manager <- newManager tlsManagerSettings
   let req = initReq {
+    method = method,
     requestHeaders = [("Authorization", B8.pack $ "Bearer " ++ (accessToken client))]
   }
-  if debug client then print req else pure ()
+  printDebug client req
   response <- httpLbs req manager
-  if debug client then print response else pure ()
+  printDebug client response
   return (response)
 
 requestWithBody :: B8.ByteString -> SFClient -> String -> String -> IO (Response BL8.ByteString)
@@ -146,9 +227,9 @@ requestWithBody method client path body = do
     ],
     requestBody = RequestBodyBS $ B8.pack body
   }
-  if debug client then print req else pure ()
+  printDebug client req
   response <- httpLbs req manager
-  if debug client then print response else pure ()
+  printDebug client response
   return (response)
 
 requestPost :: SFClient -> String -> String -> IO (Response BL8.ByteString)
@@ -157,8 +238,9 @@ requestPost = requestWithBody "POST"
 requestPatch :: SFClient -> String -> String -> IO (Response BL8.ByteString)
 requestPatch = requestWithBody "PATCH"
 
-requestDelete :: SFClient -> String -> String -> IO (Response BL8.ByteString)
-requestDelete = requestWithBody "DELETE"
+printDebug :: (Show a) => SFClient -> a -> IO ()
+printDebug client var = do
+  if debug client then print var else pure ()
 
 dataPath :: SFClient -> String
 dataPath client = do
