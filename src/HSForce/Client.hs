@@ -16,6 +16,8 @@ import Data.ByteString.Char8 as B8
 import Data.ByteString.Lazy.Char8 as BL8
 import Data.Proxy as DP
 import Data.Maybe
+import Data.Text as T
+import Data.HashMap.Strict as M
 import Data.List as L
 import Text.HTML.TagSoup.Entity
 import Text.XML.HaXml
@@ -46,7 +48,7 @@ login username password endpoint clientApiVersion = do
   \</env:Envelope>" :: String
   initReq <- parseRequest $ "https://" ++ endpoint ++ "/services/Soap/u/" ++ clientApiVersion
   manager <- newManager tlsManagerSettings
-  let requestBody = L.foldl (\body (bind,value) -> replace bind (escapeXML value) body) body [("{username}", username), ("{password}", password)]
+  let requestBody = L.foldl (\body (bind,value) -> HSForce.Util.replace bind (escapeXML value) body) body [("{username}", username), ("{password}", password)]
   let req = initReq {
     method = "POST",
     requestHeaders = [("Content-Type", "text/xml"), ("SOAPAction", "''")],
@@ -69,8 +71,8 @@ login' = do
   version <- getEnv "SALESFORCE_VERSION"
   login username password endpoint version
 
-login'' :: String -> String -> String -> String -> String -> String -> IO ()
-login'' username password endpoint version clientId clientSecret = do
+login'' :: String -> String -> String -> String -> String -> String -> IO (SFClient)
+login'' username password endpoint clientApiVersion clientId clientSecret = do
   initReq <- parseRequest $ "https://" ++ endpoint ++ "/services/oauth2/token"
   manager <- newManager tlsManagerSettings
   let params = [
@@ -83,12 +85,14 @@ login'' username password endpoint version clientId clientSecret = do
       requestBody = L.tail $ L.foldl (\body (k,v) -> body ++ "&" ++ k ++ "=" ++ URI.encode v) "" params
       req = initReq {
         method = "POST",
-        requestHeaders = [("Content-Type", "text/xml"), ("SOAPAction", "''")],
+        requestHeaders = [("Content-Type", "application/x-www-form-urlencoded")],
         requestBody = RequestBodyBS $ B8.pack requestBody
       }
-  print requestBody
   response <- httpLbs req manager
-  print response
+  let tokenObject = fromJust (JSON.decode $ responseBody response :: Maybe Object)
+      clientAccessToken = T.unpack . getText . fromJust $ M.lookup "access_token" tokenObject
+      clientInstanceUrl = T.unpack . getText . fromJust $ M.lookup "instance_url" tokenObject
+  return SFClient{clientAccessToken, clientApiVersion, clientInstanceUrl, clientDebug = False}
 
 requestGet :: SFClient -> String -> IO (Response BL8.ByteString)
 requestGet = requestWithoutBody "GET"
@@ -139,5 +143,8 @@ printDebug client var = do
 dataPath :: SFClient -> String
 dataPath client = do
   "/services/data/" ++ (clientApiVersion client)
+
+getText :: Value -> Text
+getText (String a) = a
 
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "client" } ''SFClient
