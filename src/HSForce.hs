@@ -20,6 +20,7 @@ module HSForce
       HSForce.describe,
       HSForce.describeDetail,
       HSForce.describeGlobal,
+      HSForce.explain,
       HSForce.Types.SObject(..),
       HSForce.Client.SFClient(..),
     ) where
@@ -71,6 +72,13 @@ queryAllMore :: (FromJSON a) => SFClient -> String -> DP.Proxy a -> IO (QueryRes
 queryAllMore client qpath _ = do
   response <- requestGet client qpath
   let res = (JSON.decode $ responseBody response) :: (FromJSON a) => Maybe (QueryResponse a)
+  return (fromJust res)
+
+explain :: SFClient -> String -> IO (Explain)
+explain client q = do
+  let path = dataPath client ++ "/query/?explain=" ++ URI.encode q
+  response <- requestGet client path
+  let res = (JSON.decode $ responseBody response) :: Maybe Explain
   return (fromJust res)
 
 search :: (FromJSON a) => SFClient -> String -> DP.Proxy a -> IO (QueryResponse a)
@@ -136,7 +144,7 @@ describe client objectName _ = do
   let res = (JSON.decode $ responseBody response) :: (FromJSON a) => Maybe (DescribeResponse a)
   return (fromJust res)
 
-describeDetail :: SFClient -> String -> IO DescribeDetail
+describeDetail :: SFClient -> String -> IO (DescribeDetail)
 describeDetail client objectName = do
   let path = dataPath client ++ "/sobjects/" ++ objectName ++ "/describe"
   response <- requestGet client path

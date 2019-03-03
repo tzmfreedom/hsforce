@@ -57,4 +57,31 @@ delete client Account{sfid = Just "xxxx"}
 
 -- query
 query client "SELECT Id, Name FROM Account WHERE Name = 'foobar'" (Proxy :: Proxy Account)
+
+-- queryMore
+queryMore client "/services/data/v20.0/query/01gD0000002HU6KIAW-2000" (Proxy :: Proxy Account)
+
+-- queryAll
+queryAll client "SELECT Id, Name FROM Account WHERE Name = 'foobar'" (Proxy :: Proxy Account)
+
+-- queryAllMore
+queryAllMore client "/services/data/v20.0/queryMore/01gD0000002HU6KIAW-2000" (Proxy :: Proxy Account)
+
+-- explain
+explain client "SELECT Id FROM Account"
+
+-- describe
+describe client "Account" (Proxy :: Proxy Account)
+
+-- describeDetail
+describeDetail client "Account"
+
+-- describeGlobal
+describeGlobal client
+
+-- recordCount
+recordCount client ["Account", "Contact", "Opportunity"]
+
+-- versions
+versions client
 ```
