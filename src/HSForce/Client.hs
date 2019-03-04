@@ -3,7 +3,20 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module HSForce.Client where
+module HSForce.Client
+    (
+      defaultLoginRequest,
+      login,
+      restLogin,
+      soapLogin,
+      requestGet,
+      requestPost,
+      requestPatch,
+      requestDelete,
+      dataPath,
+      SFClient(..),
+      LoginRequest(..),
+    ) where
 
 import Network.HTTP.Conduit
 import Network.URI
