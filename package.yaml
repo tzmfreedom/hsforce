@@ -1,23 +1,23 @@
 name:                hsforce
 version:             0.1.0.0
-github:              "githubuser/hsforce"
+github:              "tzmfreedom/hsforce"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2019 Author name here"
+author:              "Makoto Tajitsu"
+maintainer:          "makoto_tajitsu@hotmail.co.jp"
+copyright:           "2019 Makoto Tajitsu"
 
 extra-source-files:
 - README.md
 - ChangeLog.md
 
 # Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
+synopsis:            Salesforce API Client
+category:            Web
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/hsforce#readme>
+description:         This package provides bindings to Salesforce API <https://github.com/githubuser/hsforce#readme>
 
 dependencies:
 - base                 >= 4.7 && < 5
@@ -36,17 +36,17 @@ dependencies:
 
 library:
   source-dirs: src
-
-executables:
-  hsforce-exe:
-    main:                Main.hs
-    source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - hsforce
+#
+#executables:
+#  hsforce-exe:
+#    main:                Main.hs
+#    source-dirs:         app
+#    ghc-options:
+#    - -threaded
+#    - -rtsopts
+#    - -with-rtsopts=-N
+#    dependencies:
+#    - hsforce
 
 tests:
   hsforce-test:
