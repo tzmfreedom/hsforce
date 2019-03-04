@@ -5,8 +5,9 @@
 
 module HSForce
     ( login,
-      login',
-      login'',
+      soapLogin,
+      restLogin,
+      defaultLoginRequest,
       HSForce.versions,
       HSForce.query,
       HSForce.queryAll,

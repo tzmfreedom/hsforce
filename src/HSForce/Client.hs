@@ -27,6 +27,7 @@ import Text.XML.HaXml.Xtract.Parse
 import Text.Regex.Posix
 import GHC.Generics
 import HSForce.Util
+import Control.Applicative
 
 data SFClient = SFClient {
   clientAccessToken :: String,
@@ -35,8 +36,42 @@ data SFClient = SFClient {
   clientDebug :: Bool
 } deriving Show
 
-login :: String -> String -> String -> String -> IO (SFClient)
-login username password endpoint clientApiVersion = do
+data LoginRequest = LoginRequest{
+  sfUsername :: Maybe String,
+  sfPassword :: Maybe String,
+  sfEndpoint :: Maybe String,
+  sfVersion :: Maybe String,
+  sfClientID :: Maybe String,
+  sfClientSecret :: Maybe String
+} deriving Show
+
+defaultLoginRequest :: IO LoginRequest
+defaultLoginRequest = do
+  sfUsername <- lookupEnv "SALESFORCE_USERNAME"
+  sfPassword <- lookupEnv "SALESFORCE_PASSWORD"
+  endpoint <- lookupEnv "SALESFORCE_ENDPOINT"
+  version <- lookupEnv "SALESFORCE_VERSION"
+  sfClientID <- lookupEnv "SALESFORCE_CLINET_ID"
+  sfClientSecret <- lookupEnv "SALESFORCE_CLIENT_SECRET"
+  return (LoginRequest{
+    sfUsername,
+    sfPassword,
+    sfEndpoint = endpoint <|> Just "login.salesforce.com",
+    sfVersion = version <|> Just "v44.0",
+    sfClientID,
+    sfClientSecret
+  })
+
+login :: LoginRequest -> IO (SFClient)
+login lr = do
+  if isOAuth lr then restLogin lr else soapLogin lr
+
+soapLogin :: LoginRequest -> IO (SFClient)
+soapLogin LoginRequest{sfUsername, sfPassword, sfEndpoint, sfVersion} = do
+  let username = fromJust sfUsername
+      password = fromJust sfPassword
+      endpoint = fromJust sfEndpoint
+      clientApiVersion = fromJust sfVersion
   let body = "<?xml version=\"1.0\" encoding=\"utf-8\"?> \
   \<env:Envelope xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:env=\"http://schemas.xmlsoap.org/soap/envelope/\"> \
     \<env:Body> \
@@ -63,16 +98,14 @@ login username password endpoint clientApiVersion = do
       matches = clientServerUrl =~ ("^(https://[^/]*)/.*" :: String) :: [[String]]
   return SFClient{clientAccessToken, clientApiVersion, clientInstanceUrl = matches !! 0 !! 1, clientDebug = False}
 
-login' :: IO (SFClient)
-login' = do
-  username <- getEnv "SALESFORCE_USERNAME"
-  password <- getEnv "SALESFORCE_PASSWORD"
-  endpoint <- getEnv "SALESFORCE_ENDPOINT"
-  version <- getEnv "SALESFORCE_VERSION"
-  login username password endpoint version
-
-login'' :: String -> String -> String -> String -> String -> String -> IO (SFClient)
-login'' username password endpoint clientApiVersion clientId clientSecret = do
+restLogin :: LoginRequest -> IO (SFClient)
+restLogin LoginRequest{sfUsername, sfPassword, sfEndpoint, sfVersion, sfClientID, sfClientSecret} = do
+  let username = fromJust sfUsername
+      password = fromJust sfPassword
+      endpoint = fromJust sfEndpoint
+      clientApiVersion = fromJust sfVersion
+      clientId = fromJust sfClientID
+      clientSecret = fromJust sfClientSecret
   initReq <- parseRequest $ "https://" ++ endpoint ++ "/services/oauth2/token"
   manager <- newManager tlsManagerSettings
   let params = [
@@ -93,6 +126,10 @@ login'' username password endpoint clientApiVersion clientId clientSecret = do
       clientAccessToken = T.unpack . getText . fromJust $ M.lookup "access_token" tokenObject
       clientInstanceUrl = T.unpack . getText . fromJust $ M.lookup "instance_url" tokenObject
   return SFClient{clientAccessToken, clientApiVersion, clientInstanceUrl, clientDebug = False}
+
+isOAuth :: LoginRequest -> Bool
+isOAuth LoginRequest{sfClientID = Just _, sfClientSecret = Just _} = True
+isOAuth _ = False
 
 requestGet :: SFClient -> String -> IO (Response BL8.ByteString)
 requestGet = requestWithoutBody "GET"
