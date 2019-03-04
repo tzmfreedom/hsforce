@@ -38,7 +38,8 @@ main = do
 --  password <- getEnv "SALESFORCE_PASSWORD"
 --  endpoint <- getEnv "SALESFORCE_ENDPOINT"
 --  version <- getEnv "SALESFORCE_VERSION"
-  client <- login'
+  loginRequest <- defaultLoginRequest
+  client <- login loginRequest
   print $ clientAccessToken client
   let client' = client { clientDebug = True}
 --  insert client Account{name="hogehoge"}
