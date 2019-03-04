@@ -23,6 +23,7 @@ module HSForce
       HSForce.describeGlobal,
       HSForce.explain,
       HSForce.Types.SObject(..),
+      HSForce.Client.LoginRequest(..),
       HSForce.Client.SFClient(..),
     ) where
 

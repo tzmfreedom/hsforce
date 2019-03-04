@@ -1,18 +1,36 @@
 # hsforce
 
-## Usage
+Salesforce API Client for Haskell
 
+## Usage
 
 Login and create Salesforce client.
 ```haskell
 main :: IO ()
 main = do
-  username <- getEnv "SALESFORCE_USERNAME"
-  password <- getEnv "SALESFORCE_PASSWORD"
-  endpoint <- getEnv "SALESFORCE_ENDPOINT"
-  version <- getEnv "SALESFORCE_VERSION"
-  client <- login username password endpoint version
+  -- get parameter from environment variables by default
+  loginRequest <- defaultLoginRequest
+  -- modify login paramter
+  let loginRequest' = loginRequest{
+    sfUsername = Just username,
+    sfPassword = Just password,
+    sfEndpoint = Just "test.salesforce.com",
+    sfVersion = Just "v44.0"
+  }
+  -- login
+  client <- login loginRequest'
 ```
+
+defaultLoginRequest is extracted value from environment variables.
+
+|Environment Variable|Description|
+|-|-|
+|SALESFORCE_USERNAME|Salesforce Username|
+|SALESFORCE_PASSWORD|Salesforce Password|
+|SALESFORCE_ENDPOINT|Salesforce Login Endpoint(e.g. "login.salesforce.com")|
+|SALESFORCE_VERSION|API Version(e.g. "v44.0"|
+|SALESFORCE_CLIENT_ID|Salesforce Application Client ID|
+|SALESFORCE_CLIENT_SECRET|Salesforce Application Client Secret|
 
 create data type that is SObject class.
 ```haskell
