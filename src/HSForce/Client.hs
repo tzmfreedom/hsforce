@@ -64,7 +64,7 @@ defaultLoginRequest = do
   sfPassword <- lookupEnv "SALESFORCE_PASSWORD"
   endpoint <- lookupEnv "SALESFORCE_ENDPOINT"
   version <- lookupEnv "SALESFORCE_VERSION"
-  sfClientID <- lookupEnv "SALESFORCE_CLINET_ID"
+  sfClientID <- lookupEnv "SALESFORCE_CLIENT_ID"
   sfClientSecret <- lookupEnv "SALESFORCE_CLIENT_SECRET"
   return (LoginRequest{
     sfUsername,
